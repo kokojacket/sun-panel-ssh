@@ -21,10 +21,10 @@ do
         shift 
         ;;
         --port_number=*)
-		port_number="${arg#*=}"
-		shift 
-		;;
-	esac
+        port_number="${arg#*=}"
+        shift 
+        ;;        
+    esac
 done
 
 # 提示用户输入文件位置，默认为 /opt/docker/sun-panel 或从命令行参数获取
@@ -32,17 +32,16 @@ file_location=${file_location:-$(input_with_default "请输入要创建文件的
 
 # 如果指定的目录不存在，则询问用户是否创建
 if [ ! -d "$file_location" ]; then
-	read -p "指定的目录不存在，是否要创建？(y/n): " create_dir_input
-	
-	if [ "$create_dir_input" = "y" ]; then      
-		if ! mkdir -p "$file_location"; then  
-			echo "无法创建目录：$file_location"
-			exit 1     
-		fi   
-	else 
-	  echo "未能创建目录，退出脚本"
-	  exit 1      
-	fi  
+    read -p "指定的目录不存在，是否要创建？(y/n): " create_dir_input
+    if [ "$create_dir_input" = "y" ]; then      
+      if ! mkdir -p "$file_location"; then  
+          echo "无法创建目录：$file_location"
+          exit 1     
+      fi   
+    else 
+      echo "未能创建目录，退出脚本"
+      exit 1      
+    fi  
 fi
 
 # 提示用户输入容器名称，默认为“sun-panel”或从命令行参数获取
@@ -57,27 +56,35 @@ echo "- 文件位置: $file_location"
 echo "- 容器名称: $container_name"
 echo "- 端口号: $port_number"
 
-cat > "${file_location}/sun-panel.yml" <<EOF # File location and name updated here as well.
+cat > "${file_location}/docker-compose.yml" <<EOF
 version: '3'
 
 services:
   sun-panel:
-	image: hslr/sun-panel:latest    
-	container_name: ${container_name}
-	restart: always    
-	ports:
-	  - "${port_number}:3002"
-	volumes:
-	  - ${file_location}/conf:/app/conf  
-	  - ${file_location}/uploads:/app/uploads   
-	  - ${file_location}/database:/app/database   
-
+    image: hslr/sun-panel:latest
+    container_name: ${container_name}
+    restart: always
+    ports:
+      - "${port_number}:3002"
+    volumes:
+      - ${file_location}/conf:/app/conf
+      - ${file_location}/uploads:/app/uploads
+      - ${file_location}/database:/app/database
 EOF
 
 echo "docker-compose配置文件已创建在${file_location}"
 
-cd "${file_location}" || { echo "切换到目录 ${file_loction} 失败"; exit 1; }
+cd "${file_location}" || { echo "切换到目录 ${file_location} 失败"; exit 1; }
 
-echo ""
-echo "--- 部署完成 ---"
+echo "使用 docker compose 启动服务..."
+if command -v docker-compose &> /dev/null; then
+  docker-compose up -d          # 使用docker-compose启动服务，显式指定配置文件位置
+elif command -v docker &> /dev/null; then  
+  docker compose up -d          # 使用docker compose启动服务，显式指定配置文件位置
+else  
+  echo "无法找到 Docker Compose 命令，请确保已经安装 Docker Compose"
+  exit 1    
+fi
+
+echo "部署完成，请使用主机IP和端口${port_number}访问服务。例如 http://<主机IP>:${port_number}"
 
